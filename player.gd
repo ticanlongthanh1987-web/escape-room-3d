@@ -1,5 +1,5 @@
 extends CharacterBody3D
-# Nhân vật góc nhìn thứ nhất: di chuyển WASD / phím mũi tên, xoay bằng chuột, nhấn E để tương tác.
+# Nhân vật góc nhìn thứ nhất: WASD / mũi tên để đi, chuột để nhìn, E tương tác, F bật/tắt đèn pin.
 
 signal interact_pressed
 
@@ -9,7 +9,9 @@ const GRAVITY := 20.0
 
 var cam: Camera3D
 var ray: RayCast3D
-var locked := false  # true khi đang mở bàn phím nhập mã hoặc đã thắng
+var flashlight: SpotLight3D
+var has_flashlight := false
+var locked := false  # true khi đang nhập mã hoặc đã thắng
 
 
 func _ready() -> void:
@@ -34,7 +36,21 @@ func _ready() -> void:
 	ray.add_exception(self)
 	cam.add_child(ray)
 
+	# đèn pin gắn vào camera (chỉ bật sau khi nhặt được)
+	flashlight = SpotLight3D.new()
+	flashlight.spot_range = 14.0
+	flashlight.spot_angle = 32.0
+	flashlight.light_energy = 3.5
+	flashlight.light_color = Color(1.0, 0.95, 0.8)
+	flashlight.visible = false
+	cam.add_child(flashlight)
+
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func give_flashlight() -> void:
+	has_flashlight = true
+	flashlight.visible = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -44,8 +60,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		rotate_y(-event.relative.x * SENS)
 		cam.rotate_x(-event.relative.y * SENS)
 		cam.rotation.x = clamp(cam.rotation.x, -1.4, 1.4)
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
-		interact_pressed.emit()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_E:
+			interact_pressed.emit()
+		elif event.keycode == KEY_F and has_flashlight:
+			flashlight.visible = not flashlight.visible
 
 
 func _physics_process(delta: float) -> void:
@@ -67,7 +86,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
-# Trả về vật đang được nhìn vào (nếu có thể tương tác), ngược lại trả về null.
+# Trả về vật đang được nhìn vào (nếu tương tác được), ngược lại trả về null.
 func get_target() -> Node:
 	if ray.is_colliding():
 		var c = ray.get_collider()
